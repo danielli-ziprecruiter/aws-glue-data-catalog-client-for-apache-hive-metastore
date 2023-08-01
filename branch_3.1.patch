@@ -1,21 +1,21 @@
-diff --git a/common/src/java/org/apache/hadoop/hive/conf/HiveConf.java b/common/src/java/org/apache/hadoop/hive/conf/HiveConf.java
-index 8959ec1244..a92c6649c8 100644
---- a/common/src/java/org/apache/hadoop/hive/conf/HiveConf.java
-+++ b/common/src/java/org/apache/hadoop/hive/conf/HiveConf.java
-@@ -637,6 +637,9 @@ private static void populateLlapDaemonVarsSet(Set<String> llapDaemonVarsSetLocal
+diff --git common/src/java/org/apache/hadoop/hive/conf/HiveConf.java common/src/java/org/apache/hadoop/hive/conf/HiveConf.java
+index 0517dc0bbc..9ad0c94172 100644
+--- common/src/java/org/apache/hadoop/hive/conf/HiveConf.java
++++ common/src/java/org/apache/hadoop/hive/conf/HiveConf.java
+@@ -637,6 +637,9 @@ public static enum ConfVars {
      // Metastore stuff. Be sure to update HiveConf.metaVars when you add something here!
      METASTOREDBTYPE("hive.metastore.db.type", "DERBY", new StringSet("DERBY", "ORACLE", "MYSQL", "MSSQL", "POSTGRES"),
          "Type of database used by the metastore. Information schema & JDBCStorageHandler depend on it."),
-+    METASTORE_CLIENT_FACTORY_CLASS("hive.metastore.client.factory.class",
++    METASTORE_CLIENT_FACTORY_CLASS("hive.imetastoreclient.factory.class",
 +            "org.apache.hadoop.hive.ql.metadata.SessionHiveMetaStoreClientFactory",
 +            "The name of the factory class that produces objects implementing the IMetaStoreClient interface."),
      /**
       * @deprecated Use MetastoreConf.WAREHOUSE
       */
-diff --git a/ql/src/java/org/apache/hadoop/hive/ql/metadata/Hive.java b/ql/src/java/org/apache/hadoop/hive/ql/metadata/Hive.java
-index ea200c85eb..d1b09f8dc0 100644
---- a/ql/src/java/org/apache/hadoop/hive/ql/metadata/Hive.java
-+++ b/ql/src/java/org/apache/hadoop/hive/ql/metadata/Hive.java
+diff --git ql/src/java/org/apache/hadoop/hive/ql/metadata/Hive.java ql/src/java/org/apache/hadoop/hive/ql/metadata/Hive.java
+index 4d2e1a4e9a..be1b87b92b 100644
+--- ql/src/java/org/apache/hadoop/hive/ql/metadata/Hive.java
++++ ql/src/java/org/apache/hadoop/hive/ql/metadata/Hive.java
 @@ -195,6 +195,7 @@
  import org.apache.hadoop.security.UserGroupInformation;
  import org.apache.hadoop.util.StringUtils;
@@ -24,15 +24,15 @@ index ea200c85eb..d1b09f8dc0 100644
  import org.apache.thrift.TException;
  import org.slf4j.Logger;
  import org.slf4j.LoggerFactory;
-@@ -431,6 +432,7 @@ public static void closeCurrent() {
+@@ -438,6 +439,7 @@ public static void closeCurrent() {
     */
    private Hive(HiveConf c, boolean doRegisterAllFns) throws HiveException {
      conf = c;
-+    
++
      if (doRegisterAllFns) {
        registerAllFunctionsOnce();
      }
-@@ -4274,8 +4276,7 @@ public static boolean isHadoop1() {
+@@ -4281,8 +4283,7 @@ public List<Partition> exchangeTablePartitions(Map<String, String> partitionSpec
    }
  
    /**
@@ -42,7 +42,7 @@ index ea200c85eb..d1b09f8dc0 100644
     *
     * @returns a Meta Store Client
     * @throws HiveMetaException
-@@ -4293,12 +4294,8 @@ public HiveMetaHook getHook(
+@@ -4300,12 +4301,8 @@ public HiveMetaHook getHook(
        }
      };
  
@@ -57,16 +57,16 @@ index ea200c85eb..d1b09f8dc0 100644
    }
  
    @Nullable
-@@ -4317,6 +4314,24 @@ private HiveStorageHandler createStorageHandler(org.apache.hadoop.hive.metastore
+@@ -4324,6 +4321,24 @@ private HiveStorageHandler createStorageHandler(org.apache.hadoop.hive.metastore
      }
    }
  
 +  private HiveMetaStoreClientFactory createMetaStoreClientFactory() throws MetaException {
-+    String metaStoreClientFactoryClassName = 
++    String metaStoreClientFactoryClassName =
 +        conf.getVar(HiveConf.ConfVars.METASTORE_CLIENT_FACTORY_CLASS);
-+    
++
 +    try {
-+      Class<? extends HiveMetaStoreClientFactory> factoryClass = 
++      Class<? extends HiveMetaStoreClientFactory> factoryClass =
 +          conf.getClassByName(metaStoreClientFactoryClassName)
 +          .asSubclass(HiveMetaStoreClientFactory.class);
 +      return ReflectionUtils.newInstance(factoryClass, conf);
@@ -78,15 +78,15 @@ index ea200c85eb..d1b09f8dc0 100644
 +      throw new MetaException(errorMessage);
 +    }
 +  }
-+  
++
    public static class SchemaException extends MetaException {
      private static final long serialVersionUID = 1L;
      public SchemaException(String message) {
-diff --git a/ql/src/java/org/apache/hadoop/hive/ql/metadata/HiveMetaStoreClientFactory.java b/ql/src/java/org/apache/hadoop/hive/ql/metadata/HiveMetaStoreClientFactory.java
+diff --git ql/src/java/org/apache/hadoop/hive/ql/metadata/HiveMetaStoreClientFactory.java ql/src/java/org/apache/hadoop/hive/ql/metadata/HiveMetaStoreClientFactory.java
 new file mode 100644
-index 0000000000..ed17b3b147
+index 0000000000..e0c3dea266
 --- /dev/null
-+++ b/ql/src/java/org/apache/hadoop/hive/ql/metadata/HiveMetaStoreClientFactory.java
++++ ql/src/java/org/apache/hadoop/hive/ql/metadata/HiveMetaStoreClientFactory.java
 @@ -0,0 +1,56 @@
 +/**
 + * Licensed to the Apache Software Foundation (ASF) under one
@@ -118,16 +118,16 @@ index 0000000000..ed17b3b147
 +/**
 + * Abstract factory that defines an interface for other factories that produce concrete
 + * MetaStoreClient objects.
-+ * 
++ *
 + */
 +public interface HiveMetaStoreClientFactory {
 +
 +  /**
 +   * A method for producing IMetaStoreClient objects.
-+   * 
++   *
 +   * The implementation returned by this method must throw a MetaException if allowEmbedded = true
 +   * and it does not support embedded mode.
-+   * 
++   *
 +   * @param conf
 +   *          Hive Configuration.
 +   * @param hookLoader
@@ -144,11 +144,11 @@ index 0000000000..ed17b3b147
 +  IMetaStoreClient createMetaStoreClient(HiveConf conf, HiveMetaHookLoader hookLoader,
 +      boolean allowEmbedded, ConcurrentHashMap<String, Long> metaCallTimeMap) throws MetaException;
 +}
-diff --git a/ql/src/java/org/apache/hadoop/hive/ql/metadata/SessionHiveMetaStoreClientFactory.java b/ql/src/java/org/apache/hadoop/hive/ql/metadata/SessionHiveMetaStoreClientFactory.java
+diff --git ql/src/java/org/apache/hadoop/hive/ql/metadata/SessionHiveMetaStoreClientFactory.java ql/src/java/org/apache/hadoop/hive/ql/metadata/SessionHiveMetaStoreClientFactory.java
 new file mode 100644
-index 0000000000..9d8445f3b6
+index 0000000000..ded46911ab
 --- /dev/null
-+++ b/ql/src/java/org/apache/hadoop/hive/ql/metadata/SessionHiveMetaStoreClientFactory.java
++++ ql/src/java/org/apache/hadoop/hive/ql/metadata/SessionHiveMetaStoreClientFactory.java
 @@ -0,0 +1,55 @@
 +/**
 + * Licensed to the Apache Software Foundation (ASF) under one
@@ -183,7 +183,7 @@ index 0000000000..9d8445f3b6
 +
 +/**
 + * Default MetaStoreClientFactory for Hive which produces SessionHiveMetaStoreClient objects.
-+ * 
++ *
 + */
 +public final class SessionHiveMetaStoreClientFactory implements HiveMetaStoreClientFactory {
 +
@@ -205,10 +205,23 @@ index 0000000000..9d8445f3b6
 +  }
 +
 +}
-diff --git a/ql/src/test/org/apache/hadoop/hive/ql/metadata/TestHive.java b/ql/src/test/org/apache/hadoop/hive/ql/metadata/TestHive.java
-index a24b6423ba..05c39b36e9 100755
---- a/ql/src/test/org/apache/hadoop/hive/ql/metadata/TestHive.java
-+++ b/ql/src/test/org/apache/hadoop/hive/ql/metadata/TestHive.java
+diff --git ql/src/java/org/apache/hadoop/hive/ql/metadata/Table.java ql/src/java/org/apache/hadoop/hive/ql/metadata/Table.java
+index f0061c01f6..668e8078b6 100644
+--- ql/src/java/org/apache/hadoop/hive/ql/metadata/Table.java
++++ ql/src/java/org/apache/hadoop/hive/ql/metadata/Table.java
+@@ -249,7 +249,7 @@ final public Properties getMetadata() {
+ 
+   final public Path getPath() {
+     String location = tTable.getSd().getLocation();
+-    if (location == null) {
++    if (location == null || location == "") {
+       return null;
+     }
+     return new Path(location);
+diff --git ql/src/test/org/apache/hadoop/hive/ql/metadata/TestHive.java ql/src/test/org/apache/hadoop/hive/ql/metadata/TestHive.java
+index 81418de1f2..d004717b56 100755
+--- ql/src/test/org/apache/hadoop/hive/ql/metadata/TestHive.java
++++ ql/src/test/org/apache/hadoop/hive/ql/metadata/TestHive.java
 @@ -19,6 +19,8 @@
  package org.apache.hadoop.hive.ql.metadata;
  
@@ -227,12 +240,10 @@ index a24b6423ba..05c39b36e9 100755
  import org.apache.hadoop.hive.metastore.PartitionDropOptions;
  import org.apache.hadoop.hive.metastore.Warehouse;
  import org.apache.hadoop.hive.metastore.api.Database;
-@@ -709,7 +713,41 @@ public void testHiveRefreshOnConfChange() throws Throwable{
-     newHiveObj = Hive.get(newHconf);
+@@ -767,6 +771,40 @@ public void testHiveRefreshOnConfChange() throws Throwable{
      assertTrue(prevHiveObj != newHiveObj);
    }
--
-+  
+ 
 +  public void testLoadingHiveMetaStoreClientFactory() throws Throwable {
 +    String factoryClassName = SessionHiveMetaStoreClientFactory.class.getName();
 +    HiveConf conf = new HiveConf();
@@ -245,11 +256,11 @@ index a24b6423ba..05c39b36e9 100755
 +    Hive.closeCurrent();
 +    Hive hive = Hive.get(conf);
 +    IMetaStoreClient msc = hive.getMSC();
-+    assertNotNull("getMSC() failed.", msc); 
-+    assertThat("Invalid default client implementation created.", msc, 
++    assertNotNull("getMSC() failed.", msc);
++    assertThat("Invalid default client implementation created.", msc,
 +        instanceOf(SessionHiveMetaStoreClient.class));
 +  }
-+  
++
 +  public void testLoadingInvalidHiveMetaStoreClientFactory() throws Throwable {
 +    // Intentionally invalid class
 +    String factoryClassName = String.class.getName();
@@ -266,7 +277,24 @@ index a24b6423ba..05c39b36e9 100755
 +      return;
 +    }
 +  }
-+  
++
    // shamelessly copied from Path in hadoop-2
    private static final String SEPARATOR = "/";
    private static final char SEPARATOR_CHAR = '/';
+diff --git service/pom.xml service/pom.xml
+index e02208dc98..75c41aa20e 100644
+--- service/pom.xml
++++ service/pom.xml
+@@ -303,6 +303,12 @@
+       <artifactId>apacheds-server-integ</artifactId>
+       <version>${apache-directory-server.version}</version>
+       <scope>test</scope>
++        <exclusions>
++            <exclusion>
++                <groupId>org.apache.directory.client.ldap</groupId>
++                <artifactId>ldap-client-api</artifactId>
++            </exclusion>
++        </exclusions>
+     </dependency>
+ 
+     <dependency>
